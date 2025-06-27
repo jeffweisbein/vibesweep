@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Run Vibesweep on itself
+      run: |
+        npx tsx src/cli.ts analyze . --pattern "src/**/*.ts" --output json > self-analysis.json
+        waste=$(cat self-analysis.json | jq '.wastePercentage')
+        echo "Code waste: ${waste}%"
+        
+        # Fail if our own code is too wasteful
+        if (( $(echo "$waste > 50" | bc -l) )); then
+          echo "❌ Our own code waste exceeds 50%!"
+          exit 1
+        fi
+    
+    - name: Upload analysis report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: vibesweep-self-analysis
+        path: self-analysis.json
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        registry-url: 'https://registry.npmjs.org'
+    
+    - run: npm ci
+    - run: npm run build
+    
+    # Uncomment when ready to publish
+    # - run: npm publish
+    #   env:
+    #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

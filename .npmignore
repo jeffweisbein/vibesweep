@@ -1,0 +1,9 @@
+test-project/
+marketing/
+scripts/
+*.md
+!README.md
+.github/
+landing-page-plan.md
+LAUNCH_CHECKLIST.md
+QUICK_LAUNCH.md
