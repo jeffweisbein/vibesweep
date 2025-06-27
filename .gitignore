@@ -6,4 +6,5 @@ dist/
 coverage/
 .vscode/
 .idea/
-test-project/
+test-project/test-analysis.json
+*.js

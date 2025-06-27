@@ -34,7 +34,7 @@ jobs:
     
     - name: Run Vibesweep on itself
       run: |
-        npx tsx src/cli-enhanced.ts analyze . --pattern "src/**/*.ts" -f json -o self-analysis.json
+        node dist/cli-enhanced.js analyze . --pattern "src/**/*.ts" -f json -o self-analysis.json
         waste=$(cat self-analysis.json | jq '.wastePercentage')
         echo "Code waste: ${waste}%"
         

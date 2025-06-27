@@ -18,7 +18,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
     "analyze": "tsx src/cli.ts"
   },
   "keywords": [
@@ -33,15 +33,15 @@
   "dependencies": {
     "@babel/parser": "^7.24.0",
     "@babel/traverse": "^7.24.0",
+    "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "glob": "^10.3.10",
-    "chalk": "^5.3.0",
     "ora": "^8.0.1",
     "simple-git": "^3.22.0"
   },
   "devDependencies": {
     "@types/babel__traverse": "^7.20.5",
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.19.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0"
