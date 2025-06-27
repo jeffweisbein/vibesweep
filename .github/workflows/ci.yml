@@ -30,16 +30,34 @@ jobs:
       run: npm run build
     
     - name: Run tests
-      run: npm test
+      run: |
+        echo "Running tests with Node ${{ matrix.node-version }}..."
+        npm test || {
+          exit_code=$?
+          echo "Tests failed with exit code $exit_code"
+          echo "Test output above may contain more details"
+          exit $exit_code
+        }
     
     - name: Run Vibesweep on itself
       run: |
-        node dist/cli-enhanced.js analyze . --pattern "src/**/*.ts" -f json -o self-analysis.json
+        chmod +x dist/src/cli-enhanced.js
+        echo "Running self-analysis..."
+        node dist/src/cli-enhanced.js analyze . --pattern "src/**/*.ts" -f json -o self-analysis.json || {
+          echo "Self-analysis failed with exit code $?"
+          exit 1
+        }
+        
+        if [ ! -f self-analysis.json ]; then
+          echo "Error: self-analysis.json was not created"
+          exit 1
+        fi
+        
         waste=$(cat self-analysis.json | jq '.wastePercentage')
         echo "Code waste: ${waste}%"
         
-        # Fail if our own code is too wasteful
-        if (( $(echo "$waste > 50" | bc -l) )); then
+        # Fail if our own code is too wasteful (using awk instead of bc for better portability)
+        if [ $(echo "$waste" | awk '{if ($1 > 50) print 1; else print 0}') -eq 1 ]; then
           echo "❌ Our own code waste exceeds 50%!"
           exit 1
         fi
@@ -48,7 +66,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: vibesweep-self-analysis
+        name: vibesweep-self-analysis-node-${{ matrix.node-version }}
         path: self-analysis.json
 
   publish:
