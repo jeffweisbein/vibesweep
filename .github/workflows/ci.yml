@@ -34,7 +34,7 @@ jobs:
     
     - name: Run Vibesweep on itself
       run: |
-        npx tsx src/cli.ts analyze . --pattern "src/**/*.ts" --output json > self-analysis.json
+        npx tsx src/cli-enhanced.ts analyze . --pattern "src/**/*.ts" -f json -o self-analysis.json
         waste=$(cat self-analysis.json | jq '.wastePercentage')
         echo "Code waste: ${waste}%"
         
@@ -45,7 +45,7 @@ jobs:
         fi
     
     - name: Upload analysis report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: vibesweep-self-analysis
