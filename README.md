@@ -5,7 +5,7 @@
 [![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/vibesweep/ci.yml?branch=main)](https://github.com/yourusername/vibesweep/actions)
 [![Code Waste](https://img.shields.io/badge/waste-38%25-orange)](https://github.com/yourusername/vibesweep)
 
-> Sweep away AI-generated code waste and vibe coding artifacts
+> Detect and remove AI-generated waste, not the good code. Keep what works, sweep the rest.
 
 ## The Problem 🚨
 
@@ -16,12 +16,14 @@
 
 ## What is Vibesweep? 
 
-Vibesweep analyzes your codebase to detect:
+Vibesweep identifies **waste** in AI-generated code - the extra 30-70% that slows down your app:
 
-- 🧟 **Dead Code** - Unused variables, functions, and imports
-- 📋 **Copy-Paste Code** - Duplicate blocks and similar patterns
-- 🤖 **AI Patterns** - Verbose comments, placeholder TODOs, over-engineering
-- 💸 **Waste Metrics** - Calculate potential savings in lines and disk space
+- 🧟 **Dead Code** - Unused variables, functions, and imports that can be deleted
+- 📋 **Duplications** - Copy-paste code and repeated implementations
+- 🤖 **AI Bloat** - Verbose comments, TODO placeholders, over-engineered solutions
+- 💸 **Real Savings** - See exactly what can be removed and how much you'll save
+
+**We don't flag good code!** Clean, working, efficient code passes with flying colors.
 
 ## Quick Start 🚀
 
@@ -160,12 +162,12 @@ We love contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 
 ## The Science Behind It
 
-Vibesweep uses multiple detection strategies:
+Vibesweep uses multiple strategies to identify waste (not all AI code):
 
-- **Dead Code Detection**: AST traversal to track variable usage
-- **Duplication Analysis**: MD5 hashing with sliding window algorithm
-- **AI Pattern Recognition**: Heuristic analysis of common AI code smells
-- **Complexity Scoring**: Cyclomatic complexity and nesting depth
+- **Dead Code Detection**: AST traversal finds truly unused code
+- **Duplication Analysis**: Identifies repeated implementations you can consolidate
+- **AI Pattern Recognition**: Detects verbose comments and boilerplate, not functionality
+- **Smart Scoring**: Only flags what can actually be removed
 
 ## FAQ
 
@@ -175,8 +177,11 @@ A: No! Vibesweep only analyzes and reports. Cleaning is always manual.
 **Q: Does it work with all languages?**  
 A: Currently supports JavaScript, TypeScript, JSX, TSX, and Python.
 
-**Q: How accurate is the AI detection?**  
-A: We use pattern matching that catches ~85% of AI-generated code.
+**Q: Does this flag all AI code as bad?**  
+A: No! We only detect waste patterns. Good AI code (clean, efficient, used) is not flagged.
+
+**Q: What's a good waste score?**  
+A: Under 20% is excellent. 20-40% is normal. Over 40% needs cleanup.
 
 **Q: Can I use this in production?**  
 A: Yes! It's read-only and safe to run anywhere.
