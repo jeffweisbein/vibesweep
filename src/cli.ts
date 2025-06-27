@@ -5,6 +5,8 @@ import ora from 'ora';
 import { GarbageCollector } from './core/garbage-collector.js';
 import { formatBytes, formatPercentage } from './utils/format.js';
 import { checkLimits, getUpgradeMessage } from './core/premium-features.js';
+import { TodoReporter } from './reports/todo-report.js';
+import type { ProjectAnalysis } from './core/garbage-collector.js';
 
 const program = new Command();
 
@@ -19,6 +21,7 @@ program
   .argument('<path>', 'Path to the project directory')
   .option('-p, --pattern <pattern>', 'File pattern to analyze', '**/*.{js,ts,jsx,tsx,py}')
   .option('-o, --output <format>', 'Output format (text, json)', 'text')
+  .option('--todos', 'Include TODO/FIXME report')
   .action(async (path, options) => {
     const spinner = ora('Analyzing project for AI-generated waste...').start();
     
@@ -40,7 +43,7 @@ program
         process.exit(1);
       }
       
-      const analysis = await gc.analyzeProject(path, options.pattern);
+      const analysis = await gc.analyzeProject(path, options.pattern, options.todos);
       
       spinner.succeed('Analysis complete!');
       
@@ -56,28 +59,7 @@ program
     }
   });
 
-interface Analysis {
-  totalFiles: number;
-  totalSize: number;
-  totalWaste: number;
-  wastePercentage: number;
-  summary: {
-    deadCodeFiles: number;
-    duplicatedFiles: number;
-    aiGeneratedFiles: number;
-    estimatedSavings: {
-      lines: number;
-      kilobytes: number;
-    };
-  };
-  topOffenders: Array<{
-    filePath: string;
-    wasteScore: number;
-    deadCode: { ratio: number };
-    duplication: { ratio: number };
-    aiPatterns: { score: number; patterns: string[] };
-  }>;
-}
+type Analysis = ProjectAnalysis;
 
 function displayResults(analysis: Analysis) {
   const output = [
@@ -127,6 +109,12 @@ function displayResults(analysis: Analysis) {
   );
   
   console.log(output.join('\n'));
+  
+  // Show TODO report if requested
+  if (analysis.todos && analysis.todos.length > 0) {
+    const todoReporter = new TodoReporter();
+    console.log(todoReporter.generateReport(analysis.todos));
+  }
 }
 
 program
@@ -144,6 +132,39 @@ program
   .argument('<path>', 'Path to analyze')
   .action(async (path) => {
     console.log('\n' + getUpgradeMessage('report'));
+  });
+
+program
+  .command('todos')
+  .description('Extract all TODO/FIXME comments')
+  .argument('<path>', 'Path to analyze')
+  .option('-p, --pattern <pattern>', 'File pattern to analyze', '**/*.{js,ts,jsx,tsx,py}')
+  .option('--markdown', 'Output as markdown')
+  .action(async (path, options) => {
+    const spinner = ora('Scanning for TODOs and FIXMEs...').start();
+    
+    try {
+      const gc = new GarbageCollector();
+      const analysis = await gc.analyzeProject(path, options.pattern, true);
+      
+      spinner.succeed('Scan complete!');
+      
+      if (!analysis.todos || analysis.todos.length === 0) {
+        console.log('\n✨ No TODOs or FIXMEs found!\n');
+        return;
+      }
+      
+      const todoReporter = new TodoReporter();
+      if (options.markdown) {
+        console.log(todoReporter.generateMarkdown(analysis.todos));
+      } else {
+        console.log(todoReporter.generateReport(analysis.todos));
+      }
+    } catch (error) {
+      spinner.fail('Scan failed');
+      console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+      process.exit(1);
+    }
   });
 
 program.parse();

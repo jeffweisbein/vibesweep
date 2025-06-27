@@ -3,6 +3,7 @@ import { glob } from 'glob';
 import { DeadCodeAnalyzer } from '../analyzers/dead-code.js';
 import { DuplicationAnalyzer } from '../analyzers/duplication.js';
 import { AIPatternAnalyzer } from '../analyzers/ai-patterns.js';
+import { TodoReporter, TodoItem } from '../reports/todo-report.js';
 
 export interface FileAnalysis {
   filePath: string;
@@ -41,20 +42,23 @@ export interface ProjectAnalysis {
       kilobytes: number;
     };
   };
+  todos?: TodoItem[];
 }
 
 export class GarbageCollector {
   private deadCodeAnalyzer = new DeadCodeAnalyzer();
   private duplicationAnalyzer = new DuplicationAnalyzer();
   private aiPatternAnalyzer = new AIPatternAnalyzer();
+  private todoReporter = new TodoReporter();
 
-  async analyzeProject(projectPath: string, pattern: string = '**/*.{js,ts,jsx,tsx,py}'): Promise<ProjectAnalysis> {
+  async analyzeProject(projectPath: string, pattern: string = '**/*.{js,ts,jsx,tsx,py}', includeTodos: boolean = false): Promise<ProjectAnalysis> {
     const files = await glob(pattern, { 
       cwd: projectPath,
       ignore: ['node_modules/**', 'dist/**', 'build/**', '.git/**']
     });
 
     const analyses: FileAnalysis[] = [];
+    const allTodos: TodoItem[] = [];
     let totalSize = 0;
     let totalWaste = 0;
 
@@ -66,6 +70,13 @@ export class GarbageCollector {
           analyses.push(analysis);
           totalSize += analysis.fileSize;
           totalWaste += analysis.fileSize * (analysis.wasteScore / 100);
+        }
+        
+        // Extract TODOs if requested
+        if (includeTodos) {
+          const content = readFileSync(filePath, 'utf-8');
+          const todos = this.todoReporter.extractTodos(file, content);
+          allTodos.push(...todos);
         }
       } catch (error) {
       }
@@ -81,7 +92,8 @@ export class GarbageCollector {
       totalWaste,
       wastePercentage: totalSize > 0 ? (totalWaste / totalSize) * 100 : 0,
       topOffenders: analyses.slice(0, 10),
-      summary
+      summary,
+      todos: includeTodos ? allTodos : undefined
     };
   }
 

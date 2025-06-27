@@ -39,6 +39,12 @@ npx vibesweep analyze . --pattern "**/*.{js,ts}"
 
 # JSON output for CI/CD
 npx vibesweep analyze . --output json
+
+# Extract TODO/FIXME comments
+npx vibesweep todos .
+
+# Include TODOs in main analysis  
+npx vibesweep analyze . --todos
 ```
 
 ## Installation
