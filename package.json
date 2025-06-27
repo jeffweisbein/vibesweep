@@ -1,19 +1,19 @@
 {
   "name": "vibesweep",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Detects and removes AI-generated code waste, dead code, and duplications",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "vibesweep": "dist/cli.js"
+    "vibesweep": "dist/cli-enhanced.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/vibesweep.git"
+    "url": "git+https://github.com/jeffweisbein/vibesweep.git"
   },
   "homepage": "https://vibesweep.ai",
   "bugs": {
-    "url": "https://github.com/yourusername/vibesweep/issues"
+    "url": "https://github.com/jeffweisbein/vibesweep/issues"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
