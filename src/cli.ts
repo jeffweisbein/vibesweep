@@ -7,6 +7,7 @@ import { formatBytes, formatPercentage } from './utils/format.js';
 import { checkLimits, getUpgradeMessage } from './core/premium-features.js';
 import { TodoReporter } from './reports/todo-report.js';
 import type { ProjectAnalysis } from './core/garbage-collector.js';
+import { createSafeFixCommand } from './cli-safe-fix.js';
 
 const program = new Command();
 
@@ -22,6 +23,7 @@ program
   .option('-p, --pattern <pattern>', 'File pattern to analyze', '**/*.{js,ts,jsx,tsx,py}')
   .option('-o, --output <format>', 'Output format (text, json)', 'text')
   .option('--todos', 'Include TODO/FIXME report')
+  .option('--fix', 'Apply safe fixes automatically')
   .action(async (path, options) => {
     const spinner = ora('Analyzing project for AI-generated waste...').start();
     
@@ -51,6 +53,49 @@ program
         console.log(JSON.stringify(analysis, null, 2));
       } else {
         displayResults(analysis);
+      }
+      
+      // Apply fixes if requested
+      if (options.fix) {
+        console.log('\n' + chalk.yellow('Applying safe fixes...'));
+        const { SafeFixer } = await import('./safety/safe-fixer.js');
+        const fixConfig = {
+          projectRoot: path,
+          dryRun: false,
+          autoConfirm: true,
+          maxFilesPerRun: 100,
+          requireGitClean: false,
+          requireBackup: true,
+          validation: {
+            runTests: false,
+            runTypeCheck: false,
+            runLinter: false
+          },
+          fixTypes: {
+            consoleLogs: true,
+            debuggerStatements: true,
+            deadCode: true
+          }
+        };
+        
+        const fixer = new SafeFixer(fixConfig);
+        const fixedFiles = analysis.topOffenders
+          .filter(a => a.wasteScore > 10)
+          .map(a => a.filePath);
+          
+        if (fixedFiles.length > 0) {
+          const result = await fixer.runSafeFixes(fixedFiles);
+          if (result.success) {
+            console.log(chalk.green(`\n✅ Applied ${result.changesApplied} fixes to ${result.filesModified} files!`));
+          } else {
+            console.log(chalk.red('\n❌ Fix operation failed:'));
+            result.errors.forEach(error => {
+              console.log(chalk.red(`  • ${error}`));
+            });
+          }
+        } else {
+          console.log(chalk.green('\n✅ No files need fixing!'));
+        }
       }
     } catch (error) {
       spinner.fail('Analysis failed');
@@ -119,11 +164,118 @@ function displayResults(analysis: Analysis) {
 
 program
   .command('clean')
-  .description('Remove detected waste (Pro feature)')
+  .description('Interactively remove detected waste')
   .argument('<path>', 'Path to clean')
   .option('--dry-run', 'Show what would be removed without removing')
+  .option('--force', 'Remove all waste without prompting')
+  .option('--types <types>', 'Comma-separated types to clean (console,comments,dead-code,duplicates)', 'console,comments,dead-code')
   .action(async (path, options) => {
-    console.log('\n' + getUpgradeMessage('autoFix'));
+    const spinner = ora('Scanning for cleanable issues...').start();
+    
+    try {
+      const gc = new GarbageCollector();
+      const analysis = await gc.analyzeProject(path);
+      
+      spinner.succeed('Scan complete!');
+      
+      // Find files with waste
+      const wastefulFiles = analysis.topOffenders.filter(f => f.wasteScore > 10);
+      
+      if (wastefulFiles.length === 0) {
+        console.log(chalk.green('\n✨ No significant waste found!'));
+        return;
+      }
+      
+      console.log(chalk.bold(`\n🧹 Found ${wastefulFiles.length} files with cleanable issues:\n`));
+      
+      const { SafeFixer } = await import('./safety/safe-fixer.js');
+      const { default: prompts } = await import('prompts');
+      
+      const typesToFix = options.types.split(',');
+      const fixConfig = {
+        projectRoot: path,
+        dryRun: options.dryRun,
+        autoConfirm: options.force,
+        maxFilesPerRun: 1000,
+        requireGitClean: false,
+        requireBackup: !options.dryRun,
+        validation: {
+          runTests: false,
+          runTypeCheck: false,
+          runLinter: false
+        },
+        fixTypes: {
+          consoleLogs: typesToFix.includes('console'),
+          debuggerStatements: typesToFix.includes('debug'),
+          deadCode: typesToFix.includes('dead-code')
+        }
+      };
+      
+      if (!options.force && !options.dryRun) {
+        // Show preview of what will be cleaned
+        let totalIssues = 0;
+        wastefulFiles.forEach(file => {
+          const issues = [];
+          if (file.deadCode.unusedVariables.length > 0) {
+            issues.push(`${file.deadCode.unusedVariables.length} unused variables`);
+            totalIssues += file.deadCode.unusedVariables.length;
+          }
+          if (file.deadCode.unusedFunctions.length > 0) {
+            issues.push(`${file.deadCode.unusedFunctions.length} unused functions`);
+            totalIssues += file.deadCode.unusedFunctions.length;
+          }
+          if (file.duplication.duplicateBlocks > 0) {
+            issues.push(`${file.duplication.duplicateBlocks} duplicate blocks`);
+            totalIssues += file.duplication.duplicateBlocks;
+          }
+          
+          if (issues.length > 0) {
+            console.log(`${chalk.yellow(file.filePath)}`);
+            console.log(`  ${issues.join(', ')}`);
+          }
+        });
+        
+        console.log(chalk.dim(`\nTotal issues: ${totalIssues}`));
+        
+        const response = await prompts({
+          type: 'confirm',
+          name: 'proceed',
+          message: 'Proceed with cleaning?',
+          initial: true
+        });
+        
+        if (!response.proceed) {
+          console.log(chalk.yellow('\nOperation cancelled.'));
+          return;
+        }
+      }
+      
+      const fixer = new SafeFixer(fixConfig);
+      const filesToClean = wastefulFiles.map(f => f.filePath);
+      const result = await fixer.runSafeFixes(filesToClean);
+      
+      if (result.success) {
+        if (result.filesModified > 0) {
+          console.log(chalk.green(`\n✅ Successfully cleaned ${result.filesModified} files!`));
+          console.log(chalk.green(`   Removed ${result.changesApplied} issues`));
+          
+          if (!options.dryRun) {
+            console.log(chalk.dim('\nRun `git diff` to review changes'));
+          }
+        } else {
+          console.log(chalk.green('\n✅ No automated fixes available for the detected issues.'));
+        }
+      } else {
+        console.log(chalk.red('\n❌ Clean operation failed:'));
+        result.errors.forEach(error => {
+          console.log(chalk.red(`  • ${error}`));
+        });
+      }
+    } catch (error) {
+      spinner.fail('Clean operation failed');
+      console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+      process.exit(1);
+    }
   });
 
 program
@@ -133,6 +285,9 @@ program
   .action(async (path) => {
     console.log('\n' + getUpgradeMessage('report'));
   });
+
+// Add the safe fix command
+program.addCommand(createSafeFixCommand());
 
 program
   .command('todos')
